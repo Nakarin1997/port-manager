@@ -1,0 +1,9 @@
+services:
+  port-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: port-manager-web
+    ports:
+      - "3080:80"
+    restart: unless-stopped
