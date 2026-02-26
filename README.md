@@ -88,6 +88,12 @@ npm run tauri build
 
 > ⚠️ **Note**: Build ครั้งแรกใช้เวลา ~45-60 วินาที (Rust compile dependencies) ครั้งถัดไปเร็วมาก (~2-3 วินาที)
 
+> 💡 **Tip**: ถ้าไม่อยาก source ทุกครั้ง ให้เพิ่มบรรทัดนี้ใน `~/.zshrc` เพื่อให้ทุก terminal session หา Rust เจอโดยอัตโนมัติ:
+>
+> ```bash
+> echo 'source "$HOME/.cargo/env"' >> ~/.zshrc
+> ```
+
 ---
 
 ### แบบที่ 2: 🌐 Web Browser (Dev Server)
