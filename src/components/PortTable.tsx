@@ -5,27 +5,41 @@ interface PortTableProps {
   ports: PortInfo[];
   isLoading: boolean;
   onKillProcess: (port: PortInfo) => void;
+  pinnedPorts: Set<number>;
+  onTogglePin: (port: number) => void;
+  isGrouped: boolean;
 }
 
-export function PortTable({ ports, isLoading, onKillProcess }: PortTableProps) {
+export function PortTable({
+  ports,
+  isLoading,
+  onKillProcess,
+  pinnedPorts,
+  onTogglePin,
+  isGrouped,
+}: PortTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: "port",
     direction: "asc",
   });
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  const handleSort = useCallback(
-    (field: SortField) => {
-      setSortConfig((prev) => ({
-        field,
-        direction:
-          prev.field === field && prev.direction === "asc" ? "desc" : "asc",
-      }));
-    },
-    []
-  );
+  const handleSort = useCallback((field: SortField) => {
+    setSortConfig((prev) => ({
+      field,
+      direction:
+        prev.field === field && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  }, []);
 
   const sortedPorts = [...ports].sort((a, b) => {
+    // Pinned ports always first
+    const aPinned = pinnedPorts.has(a.port);
+    const bPinned = pinnedPorts.has(b.port);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+
     const dir = sortConfig.direction === "asc" ? 1 : -1;
     const field = sortConfig.field;
     if (field === "port" || field === "pid") {
@@ -59,6 +73,18 @@ export function PortTable({ ports, isLoading, onKillProcess }: PortTableProps) {
     }
   };
 
+  const toggleGroupCollapse = useCallback((groupName: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
+  }, []);
+
   if (isLoading && ports.length === 0) {
     return (
       <div className="table-container">
@@ -70,11 +96,90 @@ export function PortTable({ ports, isLoading, onKillProcess }: PortTableProps) {
     );
   }
 
+  // Group ports by process_name
+  const groupedPorts: Record<string, PortInfo[]> = {};
+  if (isGrouped) {
+    for (const port of sortedPorts) {
+      if (!groupedPorts[port.process_name]) {
+        groupedPorts[port.process_name] = [];
+      }
+      groupedPorts[port.process_name].push(port);
+    }
+  }
+
+  const renderRow = (port: PortInfo, index: number) => {
+    const isPinned = pinnedPorts.has(port.port);
+    return (
+      <tr
+        key={`${port.pid}-${port.port}-${port.fd}-${index}`}
+        className={`port-row fade-in ${isPinned ? "pinned-row" : ""}`}
+        style={{ animationDelay: `${index * 0.02}s` }}
+      >
+        <td className="pin-col">
+          <button
+            className={`pin-btn ${isPinned ? "pinned" : ""}`}
+            onClick={() => onTogglePin(port.port)}
+            title={isPinned ? "Unpin port" : "Pin port to top"}
+          >
+            {isPinned ? "★" : "☆"}
+          </button>
+        </td>
+        <td className="port-number">
+          <span
+            className={`copy-button ${copiedId === `port-${port.port}-${index}` ? "copied" : ""}`}
+            onClick={() =>
+              handleCopy(port.port.toString(), `port-${port.port}-${index}`)
+            }
+            title="Copy port"
+          >
+            {port.port}
+          </span>
+        </td>
+        <td>
+          <span className="protocol-badge">{port.protocol}</span>
+        </td>
+        <td className="pid-cell">
+          <span
+            className={`copy-button ${copiedId === `pid-${port.pid}-${index}` ? "copied" : ""}`}
+            onClick={() =>
+              handleCopy(port.pid.toString(), `pid-${port.pid}-${index}`)
+            }
+            title="Copy PID"
+          >
+            {port.pid}
+          </span>
+        </td>
+        <td className="process-name" title={port.process_name}>
+          {port.process_name}
+        </td>
+        <td className="user-cell">{port.user}</td>
+        <td>
+          <span className={`state-badge ${getStateClass(port.state)}`}>
+            {port.state}
+          </span>
+        </td>
+        <td className="address-cell" title={port.local_address}>
+          {port.local_address}
+        </td>
+        <td className="action-col">
+          <button
+            className="kill-btn"
+            onClick={() => onKillProcess(port)}
+            title={`Kill process ${port.process_name} (PID: ${port.pid})`}
+          >
+            <span className="kill-icon">✕</span>
+          </button>
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <div className="table-container">
       <table className="port-table">
         <thead>
           <tr>
+            <th className="pin-col-header">📌</th>
             <th onClick={() => handleSort("port")} className="sortable">
               Port {getSortIcon("port")}
             </th>
@@ -100,72 +205,37 @@ export function PortTable({ ports, isLoading, onKillProcess }: PortTableProps) {
         <tbody>
           {sortedPorts.length === 0 ? (
             <tr>
-              <td colSpan={8} className="empty-state">
+              <td colSpan={9} className="empty-state">
                 <span className="empty-icon">🔍</span>
                 <span>No matching ports found</span>
               </td>
             </tr>
+          ) : isGrouped ? (
+            Object.entries(groupedPorts).map(([groupName, groupPorts]) => {
+              const isCollapsed = collapsedGroups.has(groupName);
+              return (
+                <tbody key={groupName} className="group-section">
+                  <tr
+                    className="group-header-row"
+                    onClick={() => toggleGroupCollapse(groupName)}
+                  >
+                    <td colSpan={9}>
+                      <div className="group-header-content">
+                        <span className="group-collapse-icon">
+                          {isCollapsed ? "▶" : "▼"}
+                        </span>
+                        <span className="group-name">🏷️ {groupName}</span>
+                        <span className="group-count">{groupPorts.length} ports</span>
+                      </div>
+                    </td>
+                  </tr>
+                  {!isCollapsed &&
+                    groupPorts.map((port, index) => renderRow(port, index))}
+                </tbody>
+              );
+            })
           ) : (
-            sortedPorts.map((port, index) => (
-              <tr
-                key={`${port.pid}-${port.port}-${port.fd}-${index}`}
-                className="port-row fade-in"
-                style={{ animationDelay: `${index * 0.02}s` }}
-              >
-                <td className="port-number">
-                  <span
-                    className={`copy-button ${copiedId === `port-${port.port}-${index}` ? "copied" : ""}`}
-                    onClick={() =>
-                      handleCopy(
-                        port.port.toString(),
-                        `port-${port.port}-${index}`
-                      )
-                    }
-                    title="Copy port"
-                  >
-                    {port.port}
-                  </span>
-                </td>
-                <td>
-                  <span className="protocol-badge">{port.protocol}</span>
-                </td>
-                <td className="pid-cell">
-                  <span
-                    className={`copy-button ${copiedId === `pid-${port.pid}-${index}` ? "copied" : ""}`}
-                    onClick={() =>
-                      handleCopy(
-                        port.pid.toString(),
-                        `pid-${port.pid}-${index}`
-                      )
-                    }
-                    title="Copy PID"
-                  >
-                    {port.pid}
-                  </span>
-                </td>
-                <td className="process-name" title={port.process_name}>
-                  {port.process_name}
-                </td>
-                <td className="user-cell">{port.user}</td>
-                <td>
-                  <span className={`state-badge ${getStateClass(port.state)}`}>
-                    {port.state}
-                  </span>
-                </td>
-                <td className="address-cell" title={port.local_address}>
-                  {port.local_address}
-                </td>
-                <td className="action-col">
-                  <button
-                    className="kill-btn"
-                    onClick={() => onKillProcess(port)}
-                    title={`Kill process ${port.process_name} (PID: ${port.pid})`}
-                  >
-                    <span className="kill-icon">✕</span>
-                  </button>
-                </td>
-              </tr>
-            ))
+            sortedPorts.map((port, index) => renderRow(port, index))
           )}
         </tbody>
       </table>

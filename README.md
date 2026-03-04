@@ -8,18 +8,24 @@ A fast and lightweight desktop application for monitoring and managing active ne
 
 ## ✨ Features
 
-| Feature                  | Description                                                                |
-| ------------------------ | -------------------------------------------------------------------------- |
-| 📊 **Port Listing**      | แสดง port ที่ active ทั้งหมด พร้อม PID, Process Name, User, State, Address |
-| 🔪 **Kill Process**      | Kill process ได้ทันทีพร้อม confirmation dialog ป้องกันการกดพลาด            |
-| 🔍 **Search & Filter**   | ค้นหาตาม port number, process name, PID, user                              |
-| 🏷️ **State Filter**      | กรองตาม state: LISTEN, ESTABLISHED, CLOSE_WAIT, TIME_WAIT                  |
-| 📡 **Protocol Filter**   | กรองตาม protocol: TCP, UDP                                                 |
-| 📋 **Copy to Clipboard** | คลิก port หรือ PID เพื่อ copy ได้ทันที                                     |
-| 🔄 **Auto Refresh**      | อัปเดตข้อมูลอัตโนมัติ (1s / 3s / 5s / 10s)                                 |
-| 📊 **Sort**              | Sort ตาม column ได้ทุก column                                              |
-| 🖥️ **System Info**       | แสดง Hostname, OS Version                                                  |
-| 🌙 **Dark Theme**        | UI สวยด้วย glassmorphism + gradient                                        |
+| Feature                    | Description                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| 📊 **Port Listing**        | แสดง port ที่ active ทั้งหมด พร้อม PID, Process Name, User, State, Address   |
+| 🔪 **Kill Process**        | Kill process ได้ทันทีพร้อม confirmation dialog ป้องกันการกดพลาด              |
+| 📜 **Kill History**        | บันทึก history ของ process ที่ kill ไป พร้อมปุ่ม Re-run เพื่อรัน process ซ้ำ |
+| 📌 **Pin/Favorite Ports**  | ปักหมุด port ที่สนใจไว้ด้านบนสุดของตาราง (localStorage)                      |
+| 🏷️ **Process Grouping**    | จัดกลุ่ม port ตาม application พร้อม collapse/expand                          |
+| 💾 **Export CSV/JSON**     | Export ข้อมูล port เป็น CSV หรือ JSON ได้ทันที                               |
+| 🎨 **Theme Customization** | เลือกธีมสีได้ 4 แบบ: Dark, Light, Purple, Ocean                              |
+| ⌨️ **Keyboard Shortcuts**  | ปุ่มลัด Cmd+K (search), Cmd+R (refresh), Cmd+E (export), Cmd+G (group)       |
+| 🔔 **Port Alerts**         | แจ้งเตือนเมื่อมี port ใหม่เปิด หรือ port หายไป                               |
+| 🔍 **Search & Filter**     | ค้นหาตาม port number, process name, PID, user                                |
+| 🏷️ **State Filter**        | กรองตาม state: LISTEN, ESTABLISHED, CLOSE_WAIT, TIME_WAIT                    |
+| 📡 **Protocol Filter**     | กรองตาม protocol: TCP, UDP                                                   |
+| 📋 **Copy to Clipboard**   | คลิก port หรือ PID เพื่อ copy ได้ทันที                                       |
+| 🔄 **Auto Refresh**        | อัปเดตข้อมูลอัตโนมัติ (1s / 3s / 5s / 10s)                                   |
+| 📊 **Sort**                | Sort ตาม column ได้ทุก column                                                |
+| 🖥️ **System Info**         | แสดง Hostname, OS Version                                                    |
 
 ---
 
@@ -159,6 +165,7 @@ port-manager/
 │       ├── PortTable.tsx       # Port table with sort & copy
 │       ├── SearchBar.tsx       # Search + filters
 │       ├── KillDialog.tsx      # Kill confirmation dialog
+│       ├── KillHistory.tsx     # Kill history panel with re-run
 │       └── StatusBar.tsx       # System info + refresh controls
 ├── src-tauri/                  # Backend (Rust)
 │   ├── src/
@@ -216,16 +223,10 @@ port-manager/
 ## 🔮 Future Features (Roadmap)
 
 - [ ] 🪟 **Cross-platform** — รองรับ Windows และ Linux
-- [ ] 📌 **Pin/Favorite Ports** — ปักหมุด port ที่สนใจไว้ด้านบน
 - [ ] 📈 **Network Traffic Monitor** — แสดงปริมาณ traffic ของแต่ละ port
-- [ ] 🔔 **Port Alerts** — แจ้งเตือนเมื่อมี port ใหม่เปิด หรือ port ที่ monitor หายไป
 - [ ] 📊 **Charts & Analytics** — กราฟแสดง port usage ตามช่วงเวลา
-- [ ] 🏷️ **Process Grouping** — จัดกลุ่ม port ตาม application
-- [ ] 💾 **Export** — Export ข้อมูล port เป็น CSV / JSON
 - [ ] 🔐 **Whitelist/Blacklist** — กำหนด port ที่อนุญาต/ไม่อนุญาต
-- [ ] 🎨 **Theme Customization** — เลือกธีมสีได้ (Light/Dark/Custom)
 - [ ] 🌐 **Remote Monitor** — Monitor port ของเครื่องอื่นผ่าน SSH
-- [ ] ⌨️ **Keyboard Shortcuts** — ปุ่มลัดสำหรับ refresh, search, kill
 - [ ] 🧩 **System Tray** — ย่อลง system tray พร้อมแจ้งเตือน
 
 ---

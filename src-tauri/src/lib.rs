@@ -20,6 +20,53 @@ pub struct SystemInfo {
     pub total_ports: usize,
 }
 
+#[derive(Debug, Serialize)]
+pub struct KillResult {
+    pub message: String,
+    pub command_path: String,
+}
+
+/// Resolve the full command line for a given PID so it can be re-run
+fn resolve_command_path(pid: u32) -> String {
+    // Primary: use ps to get the FULL command line (with arguments)
+    // This is the most reliable way to re-run a process
+    if let Ok(output) = Command::new("/bin/ps")
+        .args(["-p", &pid.to_string(), "-o", "command="])
+        .output()
+    {
+        let command = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !command.is_empty() {
+            return command;
+        }
+    }
+
+    // Fallback: use lsof to find the executable from 'txt' file descriptor
+    if let Ok(output) = Command::new("/usr/sbin/lsof")
+        .args(["-p", &pid.to_string(), "-Ftfn"])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut current_fd = String::new();
+
+        for line in stdout.lines() {
+            if let Some(fd) = line.strip_prefix('f') {
+                current_fd = fd.to_string();
+            } else if let Some(path) = line.strip_prefix('n') {
+                if current_fd == "txt"
+                    && path.starts_with('/')
+                    && !path.contains("->")
+                    && !path.ends_with(".dylib")
+                    && !path.ends_with(".so")
+                {
+                    return path.to_string();
+                }
+            }
+        }
+    }
+
+    String::new()
+}
+
 /// Parse lsof output to extract port information
 fn parse_lsof_output(output: &str) -> Vec<PortInfo> {
     let mut ports: Vec<PortInfo> = Vec::new();
@@ -77,7 +124,12 @@ fn parse_lsof_output(output: &str) -> Vec<PortInfo> {
 fn get_active_ports() -> Result<Vec<PortInfo>, String> {
     // Use lsof to get all TCP and UDP connections
     let tcp_output = Command::new("/usr/sbin/lsof")
-        .args(["-iTCP", "-P", "-n", "-sTCP:LISTEN,ESTABLISHED,CLOSE_WAIT,TIME_WAIT"])
+        .args([
+            "-iTCP",
+            "-P",
+            "-n",
+            "-sTCP:LISTEN,ESTABLISHED,CLOSE_WAIT,TIME_WAIT",
+        ])
         .output()
         .map_err(|e| format!("Failed to execute lsof for TCP: {}", e))?;
 
@@ -100,10 +152,13 @@ fn get_active_ports() -> Result<Vec<PortInfo>, String> {
 }
 
 #[tauri::command]
-fn kill_process(pid: u32) -> Result<String, String> {
+fn kill_process(pid: u32) -> Result<KillResult, String> {
     if pid == 0 {
         return Err("Invalid PID".to_string());
     }
+
+    // Resolve the executable path BEFORE killing
+    let command_path = resolve_command_path(pid);
 
     // First try graceful kill (SIGTERM)
     let output = Command::new("/bin/kill")
@@ -112,7 +167,10 @@ fn kill_process(pid: u32) -> Result<String, String> {
         .map_err(|e| format!("Failed to execute kill: {}", e))?;
 
     if output.status.success() {
-        Ok(format!("Process {} terminated successfully", pid))
+        Ok(KillResult {
+            message: format!("Process {} terminated successfully", pid),
+            command_path,
+        })
     } else {
         // If SIGTERM fails, try SIGKILL
         let output = Command::new("/bin/kill")
@@ -121,12 +179,30 @@ fn kill_process(pid: u32) -> Result<String, String> {
             .map_err(|e| format!("Failed to force kill: {}", e))?;
 
         if output.status.success() {
-            Ok(format!("Process {} force killed", pid))
+            Ok(KillResult {
+                message: format!("Process {} force killed", pid),
+                command_path,
+            })
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
             Err(format!("Failed to kill process {}: {}", pid, stderr))
         }
     }
+}
+
+#[tauri::command]
+fn run_command(command_path: String) -> Result<String, String> {
+    if command_path.is_empty() {
+        return Err("No command path available for this process".to_string());
+    }
+
+    // Use shell to execute the full command (supports args, env, etc.)
+    Command::new("/bin/sh")
+        .args(["-c", &command_path])
+        .spawn()
+        .map_err(|e| format!("Failed to start process '{}': {}", command_path, e))?;
+
+    Ok(format!("Process started successfully"))
 }
 
 #[tauri::command]
@@ -158,6 +234,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_active_ports,
             kill_process,
+            run_command,
             get_system_info
         ])
         .run(tauri::generate_context!())

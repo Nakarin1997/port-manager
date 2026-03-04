@@ -1,4 +1,6 @@
 import { useCallback } from "react";
+import { PortInfo } from "../types";
+import { ExportButton } from "./ExportButton";
 
 interface SearchBarProps {
   searchQuery: string;
@@ -9,6 +11,9 @@ interface SearchBarProps {
   onFilterProtocolChange: (protocol: string) => void;
   totalPorts: number;
   filteredCount: number;
+  isGrouped: boolean;
+  onToggleGrouped: () => void;
+  ports: PortInfo[];
 }
 
 export function SearchBar({
@@ -20,6 +25,9 @@ export function SearchBar({
   onFilterProtocolChange,
   totalPorts,
   filteredCount,
+  isGrouped,
+  onToggleGrouped,
+  ports,
 }: SearchBarProps) {
   const handleClear = useCallback(() => {
     onSearchChange("");
@@ -36,7 +44,8 @@ export function SearchBar({
         <span className="search-icon">🔍</span>
         <input
           type="text"
-          placeholder="Search by port, process name, PID, or user..."
+          id="search-input"
+          placeholder="Search by port, process name, PID, or user... (Cmd+K)"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="search-input"
@@ -70,6 +79,16 @@ export function SearchBar({
           <option value="TCP">TCP</option>
           <option value="UDP">UDP</option>
         </select>
+
+        <button
+          className={`group-toggle-btn ${isGrouped ? "active" : ""}`}
+          onClick={onToggleGrouped}
+          title={`${isGrouped ? "Disable" : "Enable"} process grouping (Cmd+G)`}
+        >
+          🏷️ {isGrouped ? "Grouped" : "Group"}
+        </button>
+
+        <ExportButton ports={ports} />
 
         <div className="result-count">
           <span className="count-badge">
